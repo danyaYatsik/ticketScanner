@@ -1,12 +1,8 @@
 package danila.org.ticketscanner;
 
-import android.Manifest;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.widget.Toast;
 
@@ -29,9 +25,8 @@ public class SplashActivity extends AppCompatActivity {
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
-        requestPermissions();
-        requestEvents();
         super.onCreate(savedInstanceState);
+        requestEvents();
     }
 
     private void requestEvents() {
@@ -43,7 +38,7 @@ public class SplashActivity extends AppCompatActivity {
                 this::onRequestEventsResult,
                 (error) -> {
                     Toast.makeText(this,
-                            "Ошибка подключения к серверу",
+                            "Помилка: мережа недоступна",
                             Toast.LENGTH_LONG)
                             .show();
                     error.printStackTrace();
@@ -64,8 +59,8 @@ public class SplashActivity extends AppCompatActivity {
                 ));
             } catch (JSONException e) {
                 Toast.makeText(this,
-                        "Некорректный ответ от сервера",
-                        Toast.LENGTH_SHORT)
+                        "Відповідь сервера невалідна",
+                        Toast.LENGTH_LONG)
                         .show();
                 e.printStackTrace();
                 finish();
@@ -74,38 +69,9 @@ public class SplashActivity extends AppCompatActivity {
         Event[] arr = events.toArray(new Event[0]);
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra("events", arr);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
         startActivity(intent);
     }
 
-    private void requestPermissions() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{Manifest.permission.CAMERA},
-                    0);
-        }
-    }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        if (grantResults.length > 0) {
-            for (int result : grantResults) {
-                if (result == PackageManager.PERMISSION_DENIED) {
-                    Toast.makeText(this,
-                            "Пожалуйста, предоставте все разрешения в настройках",
-                            Toast.LENGTH_SHORT)
-                            .show();
-                    finish();
-                }
-            }
-        }
-    }
-
-    @Override
-    protected void onRestart() {
-        super.onRestart();
-        finish();
-    }
 }

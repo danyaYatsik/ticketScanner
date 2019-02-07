@@ -6,10 +6,6 @@
     tools:context=".ScanActivity"
     android:orientation="vertical">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/colorBlack" />
 
     <SurfaceView
         android:id="@+id/camera"
@@ -20,14 +16,16 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="@color/colorBlack" />
+        android:background="@color/colorWhite" />
 
     <TextView
         android:id="@+id/status_message"
-        android:text="{MESSAGE}"
         android:textAlignment="center"
+        android:padding="20dp"
+        android:visibility="gone"
+        android:textColor="@color/colorWhite"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_height="wrap_content"
+        android:textSize="25sp" />
 
 </LinearLayout>

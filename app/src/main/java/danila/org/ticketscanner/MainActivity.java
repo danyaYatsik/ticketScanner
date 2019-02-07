@@ -1,24 +1,20 @@
 package danila.org.ticketscanner;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.Parcel;
 import android.os.Parcelable;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
-import android.text.Editable;
-import android.text.TextWatcher;
-import android.widget.EditText;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.ListView;
+import android.widget.SearchView;
 import android.widget.SimpleAdapter;
 import android.widget.Toast;
-
-import com.android.volley.Request;
-import com.android.volley.RequestQueue;
-import com.android.volley.toolbox.JsonArrayRequest;
-import com.android.volley.toolbox.Volley;
-
-import org.json.JSONException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,149 +28,103 @@ public class MainActivity extends AppCompatActivity {
 
     private List<Map<String, String>> itemsList;
     private SimpleAdapter listAdapter;
-    private EditText searchField;
     private List<Map<String, String>> itemsListCopy;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        requestPermissions();
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setTitle("");
+            actionBar.setTitle("Оберіть сеанс");
         }
 
-
-        ListView listView = findViewById(R.id.list_view);
         itemsList = new ArrayList<>();
         listAdapter = new SimpleAdapter(this, itemsList, R.layout.list_item,
                 new String[]{"text", "subtext", "id"}, new int[]{R.id.list_item_text, R.id.list_item_subtext, R.id.list_item});
-        listView.setAdapter(listAdapter);
-        getEvents();
+        fillItemsList();
         itemsListCopy = new ArrayList<>(itemsList);
-
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            Intent intent = new Intent(MainActivity.this, ScanActivity.class);
-            String eventName = (String) ((HashMap)parent.getItemAtPosition(position)).get("text");
-            intent.putExtra("event-name", eventName);
-            startActivity(intent);
-        });
-
-
-        searchField = findViewById(R.id.search_view);
-        searchField.addTextChangedListener(new TextWatcher() {
-            {
-                ArrayList<Map<String, String>> arrayCopy = new ArrayList<>(itemsList);
-            }
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                System.out.println(Arrays.toString(itemsListCopy.toArray())) ;
-                for (Map<String, String> map : itemsListCopy) {
-                    if (!map.get("text").toLowerCase().contains(s.toString().toLowerCase())) {
-                        itemsList.remove(map);
-                        listAdapter.notifyDataSetChanged();
-                        System.out.println("item removed");
-                    } else if (!itemsList.contains(map)) {
-                        itemsList.add(map);
-                        listAdapter.notifyDataSetChanged();
-                        System.out.println("item added");
-                    }
-                }
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-
-            }
-        });
-
     }
 
-    private void getEvents() {
+    private void fillItemsList() {
+        ListView listView = findViewById(R.id.list_view);
+        listView.setAdapter(listAdapter);
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            Intent intent = new Intent(MainActivity.this, ScanActivity.class);
+            String eventName = (String) ((HashMap) parent.getItemAtPosition(position)).get("text");
+            intent.putExtra("event-name", eventName);
+            String eventId = (String) ((HashMap) parent.getItemAtPosition(position)).get("id");
+            intent.putExtra("event-id", eventId);
+            String eventMeta = (String) ((HashMap) parent.getItemAtPosition(position)).get("subtext");
+            intent.putExtra("event-meta", eventMeta);
+            startActivity(intent);
+        });
 
         List<Parcelable> eventsDemo = Arrays.asList(getIntent().getParcelableArrayExtra("events"));
         for (Parcelable p : eventsDemo) {
-
-            addItemToList((Event)p);
-
+            Event event = (Event) p;
+            Map<String, String> map = new HashMap<>();
+            map.put("text", event.getName());
+            map.put("subtext", event.getDescription());
+            map.put("id", event.getId());
+            itemsList.add(map);
+            listAdapter.notifyDataSetChanged();
         }
     }
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu, menu);
+        MenuItem searchItem = menu.findItem(R.id.app_bar_search);
+        SearchView searchView = (SearchView) searchItem.getActionView();
 
-
-    /*private TextView prepareTextView(JSONObject obj) throws JSONException {
-        TextView view = new TextView(this);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.setMargins(20, 20, 20, 20);
-        view.setLayoutParams(params);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 30);
-        view.setText(obj.getString("name"));
-        view.setClickable(true);
-        view.setTextColor(Color.BLACK);
-        view.setBackground(getResources().getDrawable(R.drawable.item_bg));
-
-        view.setOnClickListener((e) -> {
-            Intent intent = new Intent(this, ScanActivity.class);
-            try {
-                intent.putExtra("event-name", obj.getString("name"));
-            } catch (JSONException e1) {
-                e1.printStackTrace();
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return false;
             }
-            startActivity(intent);
-        });
-        return view;
-    }*/
 
-
-
-   /* private void getEvents() {
-        RequestQueue queue = Volley.newRequestQueue(this);
-        JsonArrayRequest request = new JsonArrayRequest(
-                Request.Method.GET,
-                EVENTS_URL,
-                null,
-                (response) -> {
-                    for (int i = 0; i < response.length(); i++) {
-                        try {
-                            addItemToList(response.getJSONObject(i).getString("name"),
-                                    response.getJSONObject(i).getString("description"));
-                        } catch (JSONException e) {
-                            Toast.makeText(this,
-                                    "Некорректный ответ от сервера",
-                                    Toast.LENGTH_SHORT)
-                                    .show();
-                            e.printStackTrace();
-                        }
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                for (Map<String, String> map : itemsListCopy) {
+                    if (!map.get("text").toLowerCase().contains(newText.toLowerCase())) {
+                        itemsList.remove(map);
+                        listAdapter.notifyDataSetChanged();
+                    } else if (!itemsList.contains(map)) {
+                        itemsList.add(map);
+                        listAdapter.notifyDataSetChanged();
                     }
-                    itemsListCopy = new ArrayList<>(itemsList);
-                },
-                (error) -> {
-                    Toast.makeText(this,
-                            "Ошибка подключения к серверу",
-                            Toast.LENGTH_SHORT)
-                            .show();
-                    error.printStackTrace();
                 }
-        );
-        queue.add(request);
-    }*/
-
-    private void addItemToList(Event event) {
-        Map<String, String> map = new HashMap<>();
-        map.put("text", event.getName());
-        map.put("subtext", event.getDescription());
-        map.put("id", event.getId());
-        itemsList.add(map);
-        listAdapter.notifyDataSetChanged();
+                return true;
+            }
+        });
+        return true;
     }
 
+    private void requestPermissions() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.CAMERA},
+                    0);
+        }
+    }
 
-
-
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        if (grantResults.length > 0) {
+            for (int result : grantResults) {
+                if (result == PackageManager.PERMISSION_DENIED) {
+                    Toast.makeText(this,
+                            "Будь-ласка, надайте всі повноваження в налаштуваннях",
+                            Toast.LENGTH_LONG)
+                            .show();
+                    finish();
+                }
+            }
+        }
+    }
 }
