@@ -1,4 +1,4 @@
-package danila.org.ticketscanner.util;
+package danila.org.ticketscanner.util.function;
 
 @FunctionalInterface
 public interface Function<T> {

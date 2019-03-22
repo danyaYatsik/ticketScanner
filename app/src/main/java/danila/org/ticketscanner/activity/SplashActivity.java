@@ -1,4 +1,4 @@
-package danila.org.ticketscanner;
+package danila.org.ticketscanner.activity;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -21,7 +21,7 @@ import danila.org.ticketscanner.model.Event;
 
 public class SplashActivity extends AppCompatActivity {
 
-    private final String EVENTS_URL = "http://tickets.docudays.org.ua/v1/mobile_app/usher/get_screenings";
+    private static final String EVENTS_URL = "http://tickets.docudays.org.ua/v1/mobile_app/usher/get_screenings";
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {

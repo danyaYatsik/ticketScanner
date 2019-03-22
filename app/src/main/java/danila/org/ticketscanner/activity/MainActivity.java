@@ -1,4 +1,4 @@
-package danila.org.ticketscanner;
+package danila.org.ticketscanner.activity;
 
 import android.Manifest;
 import android.content.Intent;
@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import danila.org.ticketscanner.R;
 import danila.org.ticketscanner.model.Event;
 
 public class MainActivity extends AppCompatActivity {
@@ -77,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu, menu);
         MenuItem searchItem = menu.findItem(R.id.app_bar_search);
+        menu.removeItem(R.id.app_bar_settings);
         SearchView searchView = (SearchView) searchItem.getActionView();
 
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
