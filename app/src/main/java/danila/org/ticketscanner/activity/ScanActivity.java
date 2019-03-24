@@ -2,7 +2,6 @@ package danila.org.ticketscanner.activity;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.drawable.Drawable;
@@ -15,8 +14,6 @@ import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -40,7 +37,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 
 import danila.org.ticketscanner.R;
-import danila.org.ticketscanner.util.service.BarcodeProvider;
+import danila.org.ticketscanner.util.service.BarcodeProcessor;
 import danila.org.ticketscanner.util.service.RequestService;
 
 public class ScanActivity extends AppCompatActivity {
@@ -48,7 +45,7 @@ public class ScanActivity extends AppCompatActivity {
     private static final String CHECK_BARCODE_URL = "http://tickets.docudays.org.ua/v1/mobile_app/usher/check_babrcode";
     private final static String TAG = "ticketScanner";
 
-    private SurfaceView camera;
+    private SurfaceView cameraView;
     private EditText manuallyEdit;
     private Button manuallySubmit;
     private View statusMessage;
@@ -63,7 +60,7 @@ public class ScanActivity extends AppCompatActivity {
     private int successSound, failedSound;
     private String prevCode;
 
-    private BarcodeProvider barcodeProvider;
+    private BarcodeProcessor barcodeProcessor;
     private RequestService requestService;
 
     @Override
@@ -71,7 +68,6 @@ public class ScanActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_scan);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             String titleText = getIntent().getStringExtra("event-name");
@@ -85,7 +81,7 @@ public class ScanActivity extends AppCompatActivity {
         successSound = loadSound("success.mp3");
         failedSound = loadSound("failed.mp3");
 
-        camera = findViewById(R.id.camera);
+        cameraView = findViewById(R.id.camera);
         manuallyEdit = findViewById(R.id.manually_edit);
         manuallySubmit = findViewById(R.id.manually_submit);
         manuallySubmit.setOnClickListener(this::onManuallySubmit);
@@ -99,7 +95,7 @@ public class ScanActivity extends AppCompatActivity {
         statusMessageLoadingPicture = getResources().getDrawable(R.drawable.proceeding);
 
         requestService = new RequestService(this, this::loading);
-        barcodeProvider = new BarcodeProvider(this, this::onBarcodeDetected);
+        barcodeProcessor = new BarcodeProcessor(this, this::onBarcodeDetected);
         createCameraSource();
     }
 
@@ -123,6 +119,7 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     private void onManuallySubmit(View view) {
+        Log.d(TAG, "onManuallySubmit");
         String code = manuallyEdit.getText().toString();
         if (TextUtils.isDigitsOnly(code) && !code.isEmpty()) {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -132,7 +129,6 @@ public class ScanActivity extends AppCompatActivity {
                 manuallyEdit.clearFocus();
             }
             vibrate(false);
-            Log.d(TAG, "before creating request " + code);
             requestService.setRequest(createRequest(code));
         } else {
             vibrate(true);
@@ -174,19 +170,22 @@ public class ScanActivity extends AppCompatActivity {
 
     private void createCameraSource() {
         BarcodeDetector barcodeDetector = new BarcodeDetector.Builder(this)
-                .setBarcodeFormats(Barcode.CODE_128)
+                .setBarcodeFormats(Barcode.CODE_128 | Barcode.EAN_8)
                 .build();
         CameraSource cameraSource = new CameraSource.Builder(this, barcodeDetector)
+                .setFacing(CameraSource.CAMERA_FACING_BACK)
                 .setAutoFocusEnabled(true)
+                .setRequestedFps(15.0f)
+                .setRequestedPreviewSize(1024, 720)
                 .build();
 
-        camera.getHolder().addCallback(new SurfaceHolder.Callback() {
+        cameraView.getHolder().addCallback(new SurfaceHolder.Callback() {
 
             @Override
             public void surfaceCreated(SurfaceHolder holder) {
                 try {
                     if (ActivityCompat.checkSelfPermission(ScanActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                        cameraSource.start(camera.getHolder());
+                        cameraSource.start(cameraView.getHolder());
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -204,7 +203,14 @@ public class ScanActivity extends AppCompatActivity {
             }
         });
 
-        barcodeDetector.setProcessor(barcodeProvider);
+        if (barcodeDetector.isOperational()) {
+            barcodeDetector.setProcessor(barcodeProcessor);
+        } else {
+            Toast.makeText(getApplicationContext(),
+                    "Детектор кодів недоступний, переконайтеся що Google Services встановлено",
+                    Toast.LENGTH_LONG).show();
+            finish();
+        }
     }
 
     @Override
@@ -225,6 +231,7 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     private JsonObjectRequest createRequest(String barcode) {
+        System.out.println("createRequest");
         JSONObject object = new JSONObject();
         try {
             object.put("screening_code", getIntent().getStringExtra("event-id"));
@@ -238,12 +245,11 @@ public class ScanActivity extends AppCompatActivity {
                 CHECK_BARCODE_URL,
                 object,
                 (response) -> {
-                    Log.d(TAG, "response");
+                    Log.d(TAG, "got response: " + response.toString());
                     for (int i = 0; i < response.length(); i++) {
                         try {
                             String status = response.getString("status");
                             String message = response.getString("description");
-                            Log.d(TAG, "response " + response.toString());
                             if (status.equals("ok")) {
                                 soundPool.play(successSound, 1, 1, 1, 0, 1);
                                 updateStatusMessage(getResources().getColor(R.color.colorAllow),
@@ -285,10 +291,10 @@ public class ScanActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        barcodeProvider.updatePreferences();
+        //barcodeProcessor.updatePreferences();
     }
 
-    @Override
+    /*@Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu, menu);
         MenuItem settingsItem = menu.findItem(R.id.app_bar_settings);
@@ -300,5 +306,6 @@ public class ScanActivity extends AppCompatActivity {
             return true;
         });
         return true;
-    }
+    }*/
+
 }

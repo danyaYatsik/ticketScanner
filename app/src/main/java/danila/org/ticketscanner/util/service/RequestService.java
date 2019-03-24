@@ -28,6 +28,7 @@ public class RequestService extends Thread {
 
     private void myWait() {
         try {
+            Log.d(TAG, "wait");
             wait();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -41,10 +42,8 @@ public class RequestService extends Thread {
                 if (request != null) {
                     onLoading.invoke();
                     sendRequest(request);
-                    Log.d(TAG, "wait");
                     myWait();
                 } else {
-                    Log.d(TAG, "wait");
                     myWait();
                 }
             }
@@ -61,6 +60,7 @@ public class RequestService extends Thread {
     }
 
     public synchronized void setRequest(JsonObjectRequest request) {
+        Log.d(TAG, "SetRequest");
         this.request = request;
         notify();
     }
