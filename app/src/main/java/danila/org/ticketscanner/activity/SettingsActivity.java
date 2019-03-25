@@ -1,4 +1,3 @@
-/*
 package danila.org.ticketscanner.activity;
 
 
@@ -80,4 +79,3 @@ public class SettingsActivity extends AppCompatActivity {
         return true;
     }
 }
-*/

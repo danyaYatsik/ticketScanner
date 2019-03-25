@@ -2,18 +2,25 @@ package danila.org.ticketscanner.activity;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.hardware.Camera;
 import android.media.AudioManager;
 import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Vibrator;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -35,6 +42,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 
 import danila.org.ticketscanner.R;
 import danila.org.ticketscanner.util.service.BarcodeProcessor;
@@ -46,6 +55,7 @@ public class ScanActivity extends AppCompatActivity {
     private final static String TAG = "ticketScanner";
 
     private SurfaceView cameraView;
+
     private EditText manuallyEdit;
     private Button manuallySubmit;
     private View statusMessage;
@@ -58,7 +68,6 @@ public class ScanActivity extends AppCompatActivity {
 
     private SoundPool soundPool;
     private int successSound, failedSound;
-    private String prevCode;
 
     private BarcodeProcessor barcodeProcessor;
     private RequestService requestService;
@@ -106,16 +115,7 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     private void onBarcodeDetected(String barcode) {
-        if (!barcode.equals(prevCode)) {
-            requestService.setRequest(createRequest(barcode));
-            prevCode = barcode;
-        } else {
-            vibrate(true);
-            updateStatusMessage(getResources().getColor(R.color.colorYellow),
-                    "Код щойно відскановано",
-                    statusMessageSuccessPicture);
-
-        }
+        requestService.setRequest(createRequest(barcode));
     }
 
     private void onManuallySubmit(View view) {
@@ -211,6 +211,66 @@ public class ScanActivity extends AppCompatActivity {
                     Toast.LENGTH_LONG).show();
             finish();
         }
+
+        cameraView.setOnTouchListener((v, event) -> {
+            Log.d(TAG, "setting focus");
+            cameraFocus(event, cameraSource);
+
+            return false;
+        });
+    }
+
+    private boolean cameraFocus(MotionEvent event, @NonNull CameraSource cameraSource) {
+        Field[] declaredFields = CameraSource.class.getDeclaredFields();
+
+        int pointerId = event.getPointerId(0);
+        int pointerIndex = event.findPointerIndex(pointerId);
+        // Get the pointer's current position
+        float x = event.getX(pointerIndex);
+        float y = event.getY(pointerIndex);
+
+        float touchMajor = event.getTouchMajor();
+        float touchMinor = event.getTouchMinor();
+
+        Rect touchRect = new Rect(
+                (int) (x - touchMajor / 2),
+                (int) (y - touchMinor / 2),
+                (int) (x + touchMajor / 2),
+                (int) (y + touchMinor / 2));
+
+        Rect focusArea = new Rect();
+        focusArea.set(touchRect.left * 2000 / cameraView.getWidth() - 1000,
+                touchRect.top * 2000 / cameraView.getHeight() - 1000,
+                touchRect.right * 2000 / cameraView.getWidth() - 1000,
+                touchRect.bottom * 2000 / cameraView.getHeight() - 1000);
+        ArrayList<Camera.Area> focusAreas = new ArrayList<>();
+        focusAreas.add(new Camera.Area(focusArea, 1000));
+
+        for (Field field : declaredFields) {
+            if (field.getType() == Camera.class) {
+                field.setAccessible(true);
+                try {
+                    Camera camera = (Camera) field.get(cameraSource);
+                    if (camera != null) {
+                        Camera.Parameters params = camera.getParameters();
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                        params.setFocusAreas(focusAreas);
+                        camera.setParameters(params);
+                        camera.autoFocus((b, camera1) -> {
+
+                        });
+                        return true;
+                    }
+
+                    return false;
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+
+                break;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -284,17 +344,17 @@ public class ScanActivity extends AppCompatActivity {
                     Log.d(TAG, error.getMessage());
                 }
         );
-        Log.d(TAG, "request object created " + request.toString());
+        Log.d(TAG, "request object created");
         return request;
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        //barcodeProcessor.updatePreferences();
+        barcodeProcessor.updatePreferences();
     }
 
-    /*@Override
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu, menu);
         MenuItem settingsItem = menu.findItem(R.id.app_bar_settings);
@@ -306,6 +366,6 @@ public class ScanActivity extends AppCompatActivity {
             return true;
         });
         return true;
-    }*/
+    }
 
 }

@@ -23,34 +23,32 @@ public class BarcodeProcessor implements Detector.Processor<Barcode> {
     private String[] codes;
     private Function<String> method;
     private Activity context;
-    private String prevCode;
     private long interval;
     private Vibrator vibrator;
-    /*private List<Pair<String, Integer>> list;
+    private List<Pair<String, Integer>> list;
     private SharedPreferences preferences;
     private int counter;
     private int total;
-    private int correct;*/
+    private int correct;
 
     public BarcodeProcessor(Activity context, Function<String> method) {
         this.context = context;
         this.method = method;
         codes = new String[3];
         interval = 0;
-        prevCode = "";
         vibrator = ((Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE));
-        //preferences = context.getSharedPreferences(PREFERENCES_FILE, Context.MODE_PRIVATE);
-        //counter = 0;
-        //list = new ArrayList<>();
-        //updatePreferences();
+        preferences = context.getSharedPreferences(PREFERENCES_FILE, Context.MODE_PRIVATE);
+        counter = 0;
+        list = new ArrayList<>();
+        updatePreferences();
     }
 
-    /*public void updatePreferences() {
+    public void updatePreferences() {
         total = preferences.getInt("total", 3);
         correct = preferences.getInt("correct", 3);
         Log.d(TAG, String.valueOf(total));
         Log.d(TAG, String.valueOf(correct));
-    }*/
+    }
 
     @Override
     public void receiveDetections(Detector.Detections<Barcode> detections) {
@@ -64,13 +62,7 @@ public class BarcodeProcessor implements Detector.Processor<Barcode> {
                 Log.d(TAG, "timeout isn't over: " + String.valueOf(time - interval));
                 return;
             }
-            /*if (currentCode.equals(prevCode)) {
-                Log.d(TAG, "codes are equal " + prevCode + " - " + String.valueOf(currentCode));
-                vibrator.vibrate(new long[]{0, 200, 50, 200}, -1);
-                interval = System.currentTimeMillis();
-                return;
-            }*/
-            /*if (counter++ < total) {
+            if (counter++ < total) {
                 Log.d(TAG, "counter " + String.valueOf(counter));
                 boolean contains = false;
                 for (int i = 0; i < list.size(); i++) {
@@ -94,31 +86,11 @@ public class BarcodeProcessor implements Detector.Processor<Barcode> {
                 });
                 if (pair.second >= correct) {
                     vibrator.vibrate(200);
-                    prevCode = pair.first;
                     method.invoke(pair.first);
                 }
                 interval = System.currentTimeMillis();
                 list = new ArrayList<>();
                 counter = 0;
-            }*/
-
-            for (int i = 0; i < codes.length; i++) {
-                if (codes[i] == null) {
-                    codes[i] = currentCode;
-                    Log.d(TAG, "code put at " + i);
-                    break;
-                }
-            }
-            if (codes[2] != null) {
-                Log.d(TAG, "array filled");
-                if (codes[0].equals(codes[1]) && codes[0].equals(codes[2])) {
-                    Log.d(TAG, "all codes are equal");
-                    vibrator.vibrate(200);
-                    prevCode = currentCode;
-                    interval = System.currentTimeMillis();
-                    method.invoke(currentCode);
-                }
-                codes = new String[3];
             }
         }
     }

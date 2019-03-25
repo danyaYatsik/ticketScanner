@@ -7,10 +7,10 @@
         android:title="Пошук"
         app:actionViewClass="android.widget.SearchView"
         app:showAsAction="ifRoom" />
-    <!--<item
+    <item
         android:id="@+id/app_bar_settings"
         android:icon="@drawable/steam"
         android:title="Налаштування"
-        app:showAsAction="never|withText" />-->
+        app:showAsAction="never|withText" />
 
 </menu>
