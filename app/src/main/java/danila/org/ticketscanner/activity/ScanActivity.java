@@ -115,6 +115,7 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     private void onBarcodeDetected(String barcode) {
+        Log.d(TAG, "onBarcodeDetected - " + barcode);
         requestService.setRequest(createRequest(barcode));
     }
 
@@ -176,9 +177,7 @@ public class ScanActivity extends AppCompatActivity {
                 .setFacing(CameraSource.CAMERA_FACING_BACK)
                 .setAutoFocusEnabled(true)
                 .setRequestedFps(15.0f)
-                .setRequestedPreviewSize(1024, 720)
                 .build();
-
         cameraView.getHolder().addCallback(new SurfaceHolder.Callback() {
 
             @Override
@@ -206,79 +205,12 @@ public class ScanActivity extends AppCompatActivity {
         if (barcodeDetector.isOperational()) {
             barcodeDetector.setProcessor(barcodeProcessor);
         } else {
+            Log.d(TAG, "barcode detector is't operational");
             Toast.makeText(getApplicationContext(),
                     "Детектор кодів недоступний, переконайтеся що Google Services встановлено",
                     Toast.LENGTH_LONG).show();
             finish();
         }
-
-        /*cameraView.setOnTouchListener((v, event) -> {
-            Log.d(TAG, "setting focus");
-            cameraFocus(event, cameraSource);
-
-            return false;
-        });*/
-    }
-
-    private boolean cameraFocus(MotionEvent event, @NonNull CameraSource cameraSource) {
-        Field[] declaredFields = CameraSource.class.getDeclaredFields();
-
-        int pointerId = event.getPointerId(0);
-        int pointerIndex = event.findPointerIndex(pointerId);
-        // Get the pointer's current position
-        float x = event.getX(pointerIndex);
-        float y = event.getY(pointerIndex);
-
-        float touchMajor = event.getTouchMajor();
-        float touchMinor = event.getTouchMinor();
-
-        Rect touchRect = new Rect(
-                (int) (x - touchMajor / 2),
-                (int) (y - touchMinor / 2),
-                (int) (x + touchMajor / 2),
-                (int) (y + touchMinor / 2));
-
-        Rect focusArea = new Rect();
-        focusArea.set(touchRect.left * 2000 / cameraView.getWidth() - 1000,
-                touchRect.top * 2000 / cameraView.getHeight() - 1000,
-                touchRect.right * 2000 / cameraView.getWidth() - 1000,
-                touchRect.bottom * 2000 / cameraView.getHeight() - 1000);
-        ArrayList<Camera.Area> focusAreas = new ArrayList<>();
-        focusAreas.add(new Camera.Area(focusArea, 1000));
-
-        for (Field field : declaredFields) {
-            if (field.getType() == Camera.class) {
-                field.setAccessible(true);
-                try {
-                    Camera camera = (Camera) field.get(cameraSource);
-                    if (camera != null) {
-                        Camera.Parameters params = camera.getParameters();
-                        StringBuilder builder = new StringBuilder();
-                        for (String mode : params.getSupportedFocusModes()) {
-                            builder.append(mode).append(" ");
-                            Log.d(TAG, mode);
-                        }
-                        Toast.makeText(getApplicationContext(),
-                                builder.toString(),
-                                Toast.LENGTH_LONG).show();
-                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
-                        params.setFocusAreas(focusAreas);
-                        camera.setParameters(params);
-                        camera.autoFocus((b, camera1) -> {
-
-                        });
-                        return true;
-                    }
-
-                    return false;
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                }
-
-                break;
-            }
-        }
-        return false;
     }
 
     @Override
@@ -313,31 +245,36 @@ public class ScanActivity extends AppCompatActivity {
                 CHECK_BARCODE_URL,
                 object,
                 (response) -> {
-                    Log.d(TAG, "got response: " + response.toString());
+                    Log.d(TAG, "got response");
                     for (int i = 0; i < response.length(); i++) {
                         try {
                             String status = response.getString("status");
                             String message = response.getString("description");
                             if (status.equals("ok")) {
+                                Log.d(TAG, "status: ok");
                                 soundPool.play(successSound, 1, 1, 1, 0, 1);
                                 updateStatusMessage(getResources().getColor(R.color.colorAllow),
                                         "Квиток " + barcode + ":\n" + message,
                                         statusMessageSuccessPicture);
                             } else if (status.equals("error")) {
+                                Log.d(TAG, "status: error");
                                 soundPool.play(failedSound, 1, 1, 1, 0, 1);
                                 updateStatusMessage(getResources().getColor(R.color.colorDenied),
                                         "Квиток " + barcode + ":\n" + message,
                                         statusMessageDeniedPicture);
                             } else if (status.equals("warning")) {
+                                Log.d(TAG, "status: warning");
                                 updateStatusMessage(getResources().getColor(R.color.colorYellow),
                                         "Квиток " + barcode + ":\n" + message,
                                         statusMessageSuccessPicture);
                             } else {
+                                Log.d(TAG, "no status, message: " + response.toString());
                                 updateStatusMessage(getResources().getColor(R.color.colorYellow),
                                         response.toString(),
                                         statusMessageInfoPicture);
                             }
                         } catch (Exception e) {
+                            Log.d(TAG, e.getMessage());
                             updateStatusMessage(getResources().getColor(R.color.colorBlack),
                                     e.getMessage(),
                                     statusMessageInfoPicture);
@@ -346,10 +283,10 @@ public class ScanActivity extends AppCompatActivity {
                     }
                 },
                 (error) -> {
+                    Log.d(TAG, error.getMessage());
                     updateStatusMessage(getResources().getColor(R.color.colorBlack),
                             error.getMessage(),
                             statusMessageInfoPicture);
-                    Log.d(TAG, error.getMessage());
                 }
         );
         Log.d(TAG, "request object created");
