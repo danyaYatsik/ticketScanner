@@ -212,12 +212,12 @@ public class ScanActivity extends AppCompatActivity {
             finish();
         }
 
-        cameraView.setOnTouchListener((v, event) -> {
+        /*cameraView.setOnTouchListener((v, event) -> {
             Log.d(TAG, "setting focus");
             cameraFocus(event, cameraSource);
 
             return false;
-        });
+        });*/
     }
 
     private boolean cameraFocus(MotionEvent event, @NonNull CameraSource cameraSource) {
@@ -253,7 +253,15 @@ public class ScanActivity extends AppCompatActivity {
                     Camera camera = (Camera) field.get(cameraSource);
                     if (camera != null) {
                         Camera.Parameters params = camera.getParameters();
-                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                        StringBuilder builder = new StringBuilder();
+                        for (String mode : params.getSupportedFocusModes()) {
+                            builder.append(mode).append(" ");
+                            Log.d(TAG, mode);
+                        }
+                        Toast.makeText(getApplicationContext(),
+                                builder.toString(),
+                                Toast.LENGTH_LONG).show();
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
                         params.setFocusAreas(focusAreas);
                         camera.setParameters(params);
                         camera.autoFocus((b, camera1) -> {
