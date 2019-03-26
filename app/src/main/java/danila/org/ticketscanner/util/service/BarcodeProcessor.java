@@ -18,28 +18,24 @@ import danila.org.ticketscanner.util.function.Function;
 
 public class BarcodeProcessor implements Detector.Processor<Barcode> {
 
-    private final static String TAG = "ticketScanner";
+    private static final String TAG = "ticketScanner";
     private static final String PREFERENCES_FILE = "preferences";
-    private String[] codes;
+    private static final int TIMEOUT = 2000;
+    private List<Pair<String, Integer>> list = new ArrayList<>();
+    private long prevScanTime = 0;
+    private int counter = 0;
     private Function<String> method;
     private Activity context;
-    private long interval;
     private Vibrator vibrator;
-    private List<Pair<String, Integer>> list;
     private SharedPreferences preferences;
-    private int counter;
     private int total;
     private int correct;
 
     public BarcodeProcessor(Activity context, Function<String> method) {
         this.context = context;
         this.method = method;
-        codes = new String[3];
-        interval = 0;
         vibrator = ((Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE));
         preferences = context.getSharedPreferences(PREFERENCES_FILE, Context.MODE_PRIVATE);
-        counter = 0;
-        list = new ArrayList<>();
         updatePreferences();
     }
 
@@ -58,8 +54,8 @@ public class BarcodeProcessor implements Detector.Processor<Barcode> {
             Log.d(TAG, "received code: " + currentCode);
 
             long time = System.currentTimeMillis();
-            if (time - interval <= 2000) {
-                Log.d(TAG, "timeout isn't over: " + String.valueOf(time - interval));
+            if (time - prevScanTime <= TIMEOUT) {
+                Log.d(TAG, "timeout isn't over: " + String.valueOf(time - prevScanTime));
                 return;
             }
             if (counter++ < total) {
@@ -78,7 +74,7 @@ public class BarcodeProcessor implements Detector.Processor<Barcode> {
                     Log.d(TAG, String.valueOf(currentCode) + " added");
                 }
             }
-            if (counter >= total){
+            if (counter >= total) {
                 Pair<String, Integer> pair = Collections.max(list, (p1, p2) -> {
                     if (p1.second.equals(p2.second)) return 0;
                     else if (p1.second > p2.second) return 1;
@@ -88,7 +84,7 @@ public class BarcodeProcessor implements Detector.Processor<Barcode> {
                     vibrator.vibrate(200);
                     method.invoke(pair.first);
                 }
-                interval = System.currentTimeMillis();
+                prevScanTime = System.currentTimeMillis();
                 list = new ArrayList<>();
                 counter = 0;
             }

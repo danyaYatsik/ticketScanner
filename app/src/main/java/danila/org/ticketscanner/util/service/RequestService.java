@@ -13,20 +13,17 @@ public class RequestService extends Thread {
 
     private final static String TAG = "ticketScanner";
     private volatile JsonObjectRequest request;
-    private NoArgFunction onLoading;
-    private boolean interrupted;
     private RequestQueue queue;
     private Activity context;
+    private boolean interrupted = false;
 
-    public RequestService(Activity context, NoArgFunction onLoading) {
-        this.onLoading = onLoading;
+    public RequestService(Activity context) {
         this.context = context;
-        interrupted = false;
         queue = Volley.newRequestQueue(context);
         start();
     }
 
-    private void myWait() {
+    public void myWait() {
         try {
             Log.d(TAG, "wait");
             wait();
@@ -40,7 +37,6 @@ public class RequestService extends Thread {
         synchronized (this) {
             while (!interrupted) {
                 if (request != null) {
-                    onLoading.invoke();
                     sendRequest(request);
                     myWait();
                 } else {
@@ -51,7 +47,7 @@ public class RequestService extends Thread {
     }
 
     private void sendRequest(JsonObjectRequest request) {
-        Log.d(TAG, "send request" + request.toString());
+        Log.d(TAG, "send request");
         queue.add(request);
     }
 
@@ -60,7 +56,7 @@ public class RequestService extends Thread {
     }
 
     public synchronized void setRequest(JsonObjectRequest request) {
-        Log.d(TAG, "SetRequest");
+        Log.d(TAG, "setRequest");
         this.request = request;
         notify();
     }

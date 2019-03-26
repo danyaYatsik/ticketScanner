@@ -5,14 +5,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.hardware.Camera;
 import android.media.AudioManager;
 import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Vibrator;
-import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
@@ -20,7 +17,6 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -42,8 +38,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import danila.org.ticketscanner.R;
 import danila.org.ticketscanner.util.service.BarcodeProcessor;
@@ -68,6 +63,8 @@ public class ScanActivity extends AppCompatActivity {
 
     private SoundPool soundPool;
     private int successSound, failedSound;
+
+    private AtomicBoolean waitingForResponse = new AtomicBoolean(false);
 
     private BarcodeProcessor barcodeProcessor;
     private RequestService requestService;
@@ -103,12 +100,12 @@ public class ScanActivity extends AppCompatActivity {
         statusMessageInfoPicture = getResources().getDrawable(R.drawable.info);
         statusMessageLoadingPicture = getResources().getDrawable(R.drawable.proceeding);
 
-        requestService = new RequestService(this, this::loading);
+        requestService = new RequestService(this);
         barcodeProcessor = new BarcodeProcessor(this, this::onBarcodeDetected);
         createCameraSource();
     }
 
-    private void loading() {
+    private void startShowLoading() {
         updateStatusMessage(getResources().getColor(R.color.colorYellow),
                 "Обробка даних...",
                 statusMessageLoadingPicture);
@@ -116,7 +113,14 @@ public class ScanActivity extends AppCompatActivity {
 
     private void onBarcodeDetected(String barcode) {
         Log.d(TAG, "onBarcodeDetected - " + barcode);
-        requestService.setRequest(createRequest(barcode));
+        if (!waitingForResponse.get()) {
+            Log.d(TAG, "setting request");
+            waitingForResponse.set(true);
+            startShowLoading();
+            requestService.setRequest(createRequest(barcode));
+        } else {
+            Log.d(TAG, "previous operation is't finished yet, barcode ignored");
+        }
     }
 
     private void onManuallySubmit(View view) {
@@ -130,7 +134,7 @@ public class ScanActivity extends AppCompatActivity {
                 manuallyEdit.clearFocus();
             }
             vibrate(false);
-            requestService.setRequest(createRequest(code));
+            onBarcodeDetected(code);
         } else {
             vibrate(true);
             Toast.makeText(this,
@@ -202,6 +206,7 @@ public class ScanActivity extends AppCompatActivity {
             }
         });
 
+        Log.d(TAG, "detector status " + String.valueOf(barcodeDetector.isOperational()));
         if (barcodeDetector.isOperational()) {
             barcodeDetector.setProcessor(barcodeProcessor);
         } else {
@@ -251,41 +256,43 @@ public class ScanActivity extends AppCompatActivity {
                             String status = response.getString("status");
                             String message = response.getString("description");
                             if (status.equals("ok")) {
-                                Log.d(TAG, "status: ok");
+                                Log.d(TAG, barcode + " status: ok");
                                 soundPool.play(successSound, 1, 1, 1, 0, 1);
                                 updateStatusMessage(getResources().getColor(R.color.colorAllow),
                                         "Квиток " + barcode + ":\n" + message,
                                         statusMessageSuccessPicture);
                             } else if (status.equals("error")) {
-                                Log.d(TAG, "status: error");
+                                Log.d(TAG, barcode + " status: error");
                                 soundPool.play(failedSound, 1, 1, 1, 0, 1);
                                 updateStatusMessage(getResources().getColor(R.color.colorDenied),
                                         "Квиток " + barcode + ":\n" + message,
                                         statusMessageDeniedPicture);
                             } else if (status.equals("warning")) {
-                                Log.d(TAG, "status: warning");
+                                Log.d(TAG, barcode + " status: warning");
                                 updateStatusMessage(getResources().getColor(R.color.colorYellow),
                                         "Квиток " + barcode + ":\n" + message,
                                         statusMessageSuccessPicture);
                             } else {
-                                Log.d(TAG, "no status, message: " + response.toString());
+                                Log.d(TAG, barcode + " no status, message: " + response.toString());
                                 updateStatusMessage(getResources().getColor(R.color.colorYellow),
                                         response.toString(),
                                         statusMessageInfoPicture);
                             }
                         } catch (Exception e) {
-                            Log.d(TAG, e.getMessage());
+                            Log.d(TAG, barcode + " " + e.getMessage());
                             updateStatusMessage(getResources().getColor(R.color.colorBlack),
-                                    e.getMessage(),
+                                    "Квиток " + barcode + "\nПомилка на боці сервера, зверніться до Жені",
                                     statusMessageInfoPicture);
                             e.printStackTrace();
                         }
                     }
+                    waitingForResponse.set(false);
+                    Log.d(TAG, "\n\n");
                 },
                 (error) -> {
-                    Log.d(TAG, error.getMessage());
+                    Log.d(TAG, barcode + " " + error.getMessage());
                     updateStatusMessage(getResources().getColor(R.color.colorBlack),
-                            error.getMessage(),
+                            "Квиток " + barcode + "\nПомилка мережі, зверніться до Жені",
                             statusMessageInfoPicture);
                 }
         );
