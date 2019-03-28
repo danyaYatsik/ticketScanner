@@ -62,7 +62,7 @@
         android:layout_margin="10dp"
         android:background="@drawable/background"
         android:padding="12dp"
-        android:textSize="17sp"
-        android:text="Застосувати" />
+        android:text="Застосувати"
+        android:textSize="17sp" />
 
 </LinearLayout>

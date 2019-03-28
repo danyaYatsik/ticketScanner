@@ -43,6 +43,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import danila.org.ticketscanner.R;
@@ -73,6 +74,8 @@ public class ScanActivity extends AppCompatActivity {
 
     private BarcodeProcessor barcodeProcessor;
     private RequestService requestService;
+
+    private static  final int FOCUS_AREA_SIZE= 70;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -184,7 +187,7 @@ public class ScanActivity extends AppCompatActivity {
                 .build();
         CameraSource cameraSource = new CameraSource.Builder(this, barcodeDetector)
                 .setFacing(CameraSource.CAMERA_FACING_BACK)
-                .setAutoFocusEnabled(false)
+                .setAutoFocusEnabled(true)
                 .setRequestedFps(15.0f)
                 .build();
 
@@ -196,10 +199,10 @@ public class ScanActivity extends AppCompatActivity {
                     if (ActivityCompat.checkSelfPermission(ScanActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                         cameraSource.start(cameraView.getHolder());
 
-                        Camera camera = getCamera(cameraSource);
+                        /*Camera camera = getCamera(cameraSource);
                         Camera.Parameters params = camera.getParameters();
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
-                        camera.setParameters(params);
+                        camera.setParameters(params);*/
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -217,10 +220,10 @@ public class ScanActivity extends AppCompatActivity {
             }
         });
 
-        /*cameraView.setOnTouchListener((v, e) -> {
-            cameraFocus(cameraSource, e);
+        cameraView.setOnTouchListener((v, e) -> {
+            focusOnTouch(cameraSource, e);
             return false;
-        });*/
+        });
 
         Log.d(TAG, "detector status " + String.valueOf(barcodeDetector.isOperational()));
         if (barcodeDetector.isOperational()) {
@@ -234,30 +237,59 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
-    private void cameraFocus(CameraSource cameraSource, MotionEvent event) {
-        int pointerId = event.getPointerId(0);
-        int pointerIndex = event.findPointerIndex(pointerId);
-        // Get the pointer's current position
-        float x = event.getX(pointerIndex);
-        float y = event.getY(pointerIndex);
+    private void focusOnTouch(CameraSource source, MotionEvent event) {
+        Camera mCamera = getCamera(source);
+        if (mCamera != null ) {
 
-        float touchMajor = event.getTouchMajor();
-        float touchMinor = event.getTouchMinor();
+            Camera.Parameters parameters = mCamera.getParameters();
+            if (parameters.getMaxNumMeteringAreas() > 0){
+                Log.i(TAG,"fancy !");
+                Rect rect = calculateFocusArea(event.getX(), event.getY());
 
-        Rect touchRect = new Rect((int)(x - touchMajor / 2), (int)(y - touchMinor / 2), (int)(x + touchMajor / 2), (int)(y + touchMinor / 2));
+                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                List<Camera.Area> meteringAreas = new ArrayList<>();
+                meteringAreas.add(new Camera.Area(rect, 800));
+                parameters.setFocusAreas(meteringAreas);
 
-        Rect focusArea = new Rect();
-
-        focusArea.set(touchRect.left * 2000 / cameraView.getWidth() - 1000,
-                touchRect.top * 2000 / cameraView.getHeight() - 1000,
-                touchRect.right * 2000 / cameraView.getWidth() - 1000,
-                touchRect.bottom * 2000 / cameraView.getHeight() - 1000);
-        // Submit focus area to camera
-
-        ArrayList<Camera.Area> focusAreas = new ArrayList<>();
-        focusAreas.add(new Camera.Area(focusArea, 1000));
-
+                mCamera.setParameters(parameters);
+                mCamera.autoFocus(mAutoFocusTakePictureCallback);
+            } else {
+                Log.d(TAG, "fucking metering areas");
+                mCamera.autoFocus(mAutoFocusTakePictureCallback);
+            }
+        }
     }
+
+    private Rect calculateFocusArea(float x, float y) {
+        int left = clamp(Float.valueOf((x / cameraView.getWidth()) * 2000 - 1000).intValue(), FOCUS_AREA_SIZE);
+        int top = clamp(Float.valueOf((y / cameraView.getHeight()) * 2000 - 1000).intValue(), FOCUS_AREA_SIZE);
+
+        return new Rect(left, top, left + FOCUS_AREA_SIZE, top + FOCUS_AREA_SIZE);
+    }
+
+    private int clamp(int touchCoordinateInCameraReper, int focusAreaSize) {
+        int result;
+        if (Math.abs(touchCoordinateInCameraReper)+focusAreaSize/2>1000){
+            if (touchCoordinateInCameraReper>0){
+                result = 1000 - focusAreaSize/2;
+            } else {
+                result = -1000 + focusAreaSize/2;
+            }
+        } else{
+            result = touchCoordinateInCameraReper - focusAreaSize/2;
+        }
+        return result;
+    }
+
+    private Camera.AutoFocusCallback mAutoFocusTakePictureCallback = (success, camera) -> {
+        if (success) {
+            // do something...
+            Log.d(TAG,"focused success!");
+        } else {
+            // do something...
+            Log.d(TAG," focusing failed!");
+        }
+    };
 
     //do not call before the camera source will be started
     private Camera getCamera(CameraSource cameraSource) {
