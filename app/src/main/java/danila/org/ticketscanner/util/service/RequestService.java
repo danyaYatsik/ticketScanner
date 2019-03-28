@@ -7,8 +7,6 @@ import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 
-import danila.org.ticketscanner.util.function.NoArgFunction;
-
 public class RequestService extends Thread {
 
     private final static String TAG = "ticketScanner";

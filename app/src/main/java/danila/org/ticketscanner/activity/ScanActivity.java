@@ -5,7 +5,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.hardware.Camera;
 import android.media.AudioManager;
 import android.media.SoundPool;
 import android.os.Bundle;
@@ -17,6 +19,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -38,6 +41,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import danila.org.ticketscanner.R;
@@ -179,9 +184,10 @@ public class ScanActivity extends AppCompatActivity {
                 .build();
         CameraSource cameraSource = new CameraSource.Builder(this, barcodeDetector)
                 .setFacing(CameraSource.CAMERA_FACING_BACK)
-                .setAutoFocusEnabled(true)
+                .setAutoFocusEnabled(false)
                 .setRequestedFps(15.0f)
                 .build();
+
         cameraView.getHolder().addCallback(new SurfaceHolder.Callback() {
 
             @Override
@@ -189,6 +195,11 @@ public class ScanActivity extends AppCompatActivity {
                 try {
                     if (ActivityCompat.checkSelfPermission(ScanActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                         cameraSource.start(cameraView.getHolder());
+
+                        Camera camera = getCamera(cameraSource);
+                        Camera.Parameters params = camera.getParameters();
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
+                        camera.setParameters(params);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -206,6 +217,11 @@ public class ScanActivity extends AppCompatActivity {
             }
         });
 
+        /*cameraView.setOnTouchListener((v, e) -> {
+            cameraFocus(cameraSource, e);
+            return false;
+        });*/
+
         Log.d(TAG, "detector status " + String.valueOf(barcodeDetector.isOperational()));
         if (barcodeDetector.isOperational()) {
             barcodeDetector.setProcessor(barcodeProcessor);
@@ -216,6 +232,53 @@ public class ScanActivity extends AppCompatActivity {
                     Toast.LENGTH_LONG).show();
             finish();
         }
+    }
+
+    private void cameraFocus(CameraSource cameraSource, MotionEvent event) {
+        int pointerId = event.getPointerId(0);
+        int pointerIndex = event.findPointerIndex(pointerId);
+        // Get the pointer's current position
+        float x = event.getX(pointerIndex);
+        float y = event.getY(pointerIndex);
+
+        float touchMajor = event.getTouchMajor();
+        float touchMinor = event.getTouchMinor();
+
+        Rect touchRect = new Rect((int)(x - touchMajor / 2), (int)(y - touchMinor / 2), (int)(x + touchMajor / 2), (int)(y + touchMinor / 2));
+
+        Rect focusArea = new Rect();
+
+        focusArea.set(touchRect.left * 2000 / cameraView.getWidth() - 1000,
+                touchRect.top * 2000 / cameraView.getHeight() - 1000,
+                touchRect.right * 2000 / cameraView.getWidth() - 1000,
+                touchRect.bottom * 2000 / cameraView.getHeight() - 1000);
+        // Submit focus area to camera
+
+        ArrayList<Camera.Area> focusAreas = new ArrayList<>();
+        focusAreas.add(new Camera.Area(focusArea, 1000));
+
+    }
+
+    //do not call before the camera source will be started
+    private Camera getCamera(CameraSource cameraSource) {
+
+        Field[] declaredFields = CameraSource.class.getDeclaredFields();
+        for (Field field : declaredFields) {
+            if (field.getType() == Camera.class) {
+                field.setAccessible(true);
+                try {
+                    Camera camera = (Camera) field.get(cameraSource);
+                    if (camera != null) {
+                        return camera;
+                    }
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+
+                break;
+            }
+        }
+        throw new RuntimeException("the camera does not available");
     }
 
     @Override
@@ -250,6 +313,7 @@ public class ScanActivity extends AppCompatActivity {
                 CHECK_BARCODE_URL,
                 object,
                 (response) -> {
+                    waitingForResponse.set(false);
                     Log.d(TAG, "got response");
                     for (int i = 0; i < response.length(); i++) {
                         try {
@@ -281,18 +345,18 @@ public class ScanActivity extends AppCompatActivity {
                         } catch (Exception e) {
                             Log.d(TAG, barcode + " " + e.getMessage());
                             updateStatusMessage(getResources().getColor(R.color.colorBlack),
-                                    "Квиток " + barcode + "\nПомилка на боці сервера, зверніться до Жені",
+                                    "Квиток " + barcode + "\nПомилка на боці сервера",
                                     statusMessageInfoPicture);
                             e.printStackTrace();
                         }
                     }
-                    waitingForResponse.set(false);
                     Log.d(TAG, "\n\n");
                 },
                 (error) -> {
+                    waitingForResponse.set(false);
                     Log.d(TAG, barcode + " " + error.getMessage());
                     updateStatusMessage(getResources().getColor(R.color.colorBlack),
-                            "Квиток " + barcode + "\nПомилка мережі, зверніться до Жені",
+                            "Квиток " + barcode + "\nПомилка мережі",
                             statusMessageInfoPicture);
                 }
         );
