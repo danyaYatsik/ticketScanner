@@ -26,6 +26,7 @@ public class RequestService extends Thread {
             Log.d(TAG, "wait");
             wait();
         } catch (InterruptedException e) {
+            Log.d(TAG, "myWait: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }

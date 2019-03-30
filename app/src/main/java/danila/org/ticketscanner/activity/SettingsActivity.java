@@ -3,6 +3,7 @@ package danila.org.ticketscanner.activity;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -10,6 +11,9 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.Toast;
+
+import java.io.File;
+import java.nio.file.Files;
 
 import danila.org.ticketscanner.R;
 
